@@ -3,8 +3,39 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { JulesClient } from '../lib/jules';
 
+// Define ToolCall interface
+export interface ToolCall {
+  name: string;
+  args: any;
+  result: any;
+}
+
+// Define interaction response interface
+export interface InteractionResponse {
+  text: string;
+  toolCalls?: ToolCall[];
+}
+
 interface AudioRecorderProps {
-  onTranscription: (text: string, response?: string) => void;
+  // Updated signature:
+  // Call once with transcription
+  // Call again with response/updates (using an ID or timestamp to correlate might be better,
+  // but for now we'll assume sequential or pass a callback that updates the specific item)
+  // Actually, the simplest way to fit the existing pattern is to allow passing updates.
+  // Let's change onTranscription to return an ID, or just pass a callback to update it.
+  // But page.tsx handles the state.
+  // Let's introduce `onInteractionStart` and `onInteractionUpdate`.
+  // For backward compatibility / minimal change:
+  // onTranscription(text) -> creates entry
+  // onResponse(text, response) -> updates entry (needs correlation)
+
+  // Let's stick to the existing prop but make the second arg optional and call it twice?
+  // page.tsx prepends to list. calling it twice would create two entries.
+
+  // So I need to change the interface.
+  onTranscriptionStart: (text: string) => string; // Returns an ID
+  onInteractionUpdate: (id: string, update: Partial<{ response: string, toolCalls: ToolCall[] }>) => void;
+
   geminiApiKey: string;
   julesApiKey: string;
   defaultRepo: string;
@@ -13,7 +44,8 @@ interface AudioRecorderProps {
 type RecordingState = 'idle' | 'recording' | 'transcribing';
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
-  onTranscription,
+  onTranscriptionStart,
+  onInteractionUpdate,
   geminiApiKey,
   julesApiKey,
   defaultRepo
@@ -92,13 +124,20 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       const transcription = await transcribeAudio(audioBlob);
       if (!transcription) return;
 
+      // Immediate feedback: Show transcription
+      const interactionId = onTranscriptionStart(transcription);
+
       // 2. Call Gemini with Jules Tools if configured
       if (julesApiKey && defaultRepo) {
         const julesClient = new JulesClient(julesApiKey);
-        const response = await processWithGemini(transcription, julesClient);
-        onTranscription(transcription, response);
+        const { text, toolCalls } = await processWithGemini(transcription, julesClient);
+        onInteractionUpdate(interactionId, { response: text, toolCalls });
       } else {
-        onTranscription(transcription);
+         // If no Jules keys, maybe we still want a generic response or just leave it as is?
+         // The original code just left it (calling onTranscription with one arg).
+         // But if we want to fix "no response", we might want to call Gemini for chat?
+         // For now, let's stick to the original logic but support the update mechanism.
+         // If no keys, the interaction remains as just transcription.
       }
 
       setRecordingState('idle');
@@ -155,7 +194,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
   };
 
-  const processWithGemini = async (prompt: string, julesClient: JulesClient): Promise<string> => {
+  const processWithGemini = async (prompt: string, julesClient: JulesClient): Promise<InteractionResponse> => {
     const tools = [{
       function_declarations: [
         {
@@ -207,13 +246,18 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     const content = candidate?.content;
     const part = content?.parts?.[0];
 
-    if (!part) return "No response from Gemini.";
+    if (!part) return { text: "No response from Gemini." };
 
     // Check for function call
     if (part.functionCall) {
       const functionCall = part.functionCall;
       const functionName = functionCall.name;
       let functionResponse;
+      let toolCallInfo: ToolCall = {
+          name: functionName,
+          args: functionCall.args,
+          result: null
+      };
 
       try {
         if (functionName === "list_running_tasks") {
@@ -226,8 +270,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         } else {
           functionResponse = { error: "Unknown function" };
         }
+        toolCallInfo.result = functionResponse;
       } catch (e) {
-        functionResponse = { error: e instanceof Error ? e.message : "Unknown error during tool execution" };
+        const errorMsg = e instanceof Error ? e.message : "Unknown error during tool execution";
+        functionResponse = { error: errorMsg };
+        toolCallInfo.result = { error: errorMsg };
       }
 
       // Send function response back to Gemini
@@ -239,7 +286,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       };
 
       messages.push({ role: "model", parts: [part] });
-      messages.push({ role: "function", parts: [functionResponsePart] } as any); // Casting as any because function role structure is specific
+      messages.push({ role: "function", parts: [functionResponsePart] } as any);
 
       const response2 = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
@@ -254,10 +301,15 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       );
 
       const data2 = await response2.json();
-      return data2.candidates?.[0]?.content?.parts?.[0]?.text || "No final response.";
+      const finalText = data2.candidates?.[0]?.content?.parts?.[0]?.text || "No final response.";
+
+      return {
+          text: finalText,
+          toolCalls: [toolCallInfo]
+      };
     }
 
-    return part.text || "No text response.";
+    return { text: part.text || "No text response." };
   };
 
   const handleButtonClick = () => {
