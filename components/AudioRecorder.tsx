@@ -205,6 +205,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
               prompt: {
                 type: "STRING",
                 description: "The description of the coding task to be performed."
+              },
+              repo: {
+                type: "STRING",
+                description: "The repository to create the task in (optional). Must be in the format 'sources/{source}'. If not provided, the default repo will be used."
               }
             },
             required: ["prompt"]
@@ -275,7 +279,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           functionResponse = { sessions };
         } else if (functionName === "create_task") {
           const taskPrompt = functionCall.args.prompt;
-          const session = await julesClient.createSession(taskPrompt, defaultRepo);
+          const repo = functionCall.args.repo || defaultRepo;
+          const session = await julesClient.createSession(taskPrompt, repo);
           functionResponse = { session };
         } else {
           functionResponse = { error: "Unknown function" };
