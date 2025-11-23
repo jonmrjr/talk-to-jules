@@ -213,6 +213,66 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
             },
             required: ["prompt"]
           }
+        },
+        {
+          name: "approve_plan",
+          description: "Approves a plan in a session.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              sessionName: {
+                type: "STRING",
+                description: "The name of the session to approve the plan for."
+              }
+            },
+            required: ["sessionName"]
+          }
+        },
+        {
+          name: "send_message",
+          description: "Sends a message from the user to a session.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              sessionName: {
+                type: "STRING",
+                description: "The name of the session to send the message to."
+              },
+              message: {
+                type: "STRING",
+                description: "The message to send."
+              }
+            },
+            required: ["sessionName", "message"]
+          }
+        },
+        {
+          name: "get_session",
+          description: "Gets a single session.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              sessionName: {
+                type: "STRING",
+                description: "The name of the session to get."
+              }
+            },
+            required: ["sessionName"]
+          }
+        },
+        {
+          name: "list_activities",
+          description: "Lists activities for a session.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              sessionName: {
+                type: "STRING",
+                description: "The name of the session to list activities for."
+              }
+            },
+            required: ["sessionName"]
+          }
         }
       ]
     }];
@@ -282,6 +342,25 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           const repo = functionCall.args.repo || defaultRepo;
           const session = await julesClient.createSession(taskPrompt, repo);
           functionResponse = { session };
+        } else if (functionName === "approve_plan") {
+          await julesClient.approvePlan(functionCall.args.sessionName);
+          functionResponse = { success: true };
+        } else if (functionName === "send_message") {
+          await julesClient.sendMessage(
+            functionCall.args.sessionName,
+            functionCall.args.message
+          );
+          functionResponse = { success: true };
+        } else if (functionName === "get_session") {
+          const session = await julesClient.getSession(
+            functionCall.args.sessionName
+          );
+          functionResponse = { session };
+        } else if (functionName === "list_activities") {
+          const activities = await julesClient.listActivities(
+            functionCall.args.sessionName
+          );
+          functionResponse = { activities };
         } else {
           functionResponse = { error: "Unknown function" };
         }

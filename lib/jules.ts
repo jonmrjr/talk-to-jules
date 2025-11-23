@@ -67,4 +67,27 @@ export class JulesClient {
     const data = await this.fetch(`/sources?pageSize=${pageSize}`);
     return data.sources || [];
   }
+
+  async approvePlan(sessionName: string): Promise<void> {
+    await this.fetch(`/${sessionName}:approvePlan`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  async sendMessage(sessionName: string, message: string): Promise<void> {
+    await this.fetch(`/${sessionName}:sendMessage`, {
+      method: 'POST',
+      body: JSON.stringify({ message: { text: message } }),
+    });
+  }
+
+  async getSession(sessionName: string): Promise<JulesSession> {
+    return this.fetch(`/${sessionName}`);
+  }
+
+  async listActivities(sessionName: string, pageSize = 10): Promise<any[]> {
+    const data = await this.fetch(`/${sessionName}/activities?pageSize=${pageSize}`);
+    return data.activities || [];
+  }
 }
