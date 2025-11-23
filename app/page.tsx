@@ -1,18 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import AudioRecorder, { ToolCall } from '@/components/AudioRecorder';
+import AudioRecorder, { ToolCall, Interaction } from '@/components/AudioRecorder';
 import Settings from '@/components/Settings';
 import { v4 as uuidv4 } from 'uuid'; // Use uuid to generate unique IDs
-
-interface Interaction {
-  id: string;
-  text: string;
-  response?: string;
-  toolCalls?: ToolCall[];
-  isLoading?: boolean;
-  timestamp: Date;
-}
 
 export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
@@ -126,6 +117,7 @@ export default function Home() {
             geminiApiKey={geminiApiKey}
             julesApiKey={julesApiKey}
             defaultRepo={defaultRepo}
+            previousInteractions={interactions}
           />
         </div>
 

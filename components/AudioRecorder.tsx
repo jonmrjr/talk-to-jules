@@ -16,29 +16,23 @@ export interface InteractionResponse {
   toolCalls?: ToolCall[];
 }
 
+export interface Interaction {
+  id: string;
+  text: string;
+  response?: string;
+  toolCalls?: ToolCall[];
+  isLoading?: boolean;
+  timestamp: Date;
+}
+
 interface AudioRecorderProps {
-  // Updated signature:
-  // Call once with transcription
-  // Call again with response/updates (using an ID or timestamp to correlate might be better,
-  // but for now we'll assume sequential or pass a callback that updates the specific item)
-  // Actually, the simplest way to fit the existing pattern is to allow passing updates.
-  // Let's change onTranscription to return an ID, or just pass a callback to update it.
-  // But page.tsx handles the state.
-  // Let's introduce `onInteractionStart` and `onInteractionUpdate`.
-  // For backward compatibility / minimal change:
-  // onTranscription(text) -> creates entry
-  // onResponse(text, response) -> updates entry (needs correlation)
-
-  // Let's stick to the existing prop but make the second arg optional and call it twice?
-  // page.tsx prepends to list. calling it twice would create two entries.
-
-  // So I need to change the interface.
   onTranscriptionStart: (text: string) => string; // Returns an ID
   onInteractionUpdate: (id: string, update: Partial<{ response: string, toolCalls: ToolCall[] }>) => void;
 
   geminiApiKey: string;
   julesApiKey: string;
   defaultRepo: string;
+  previousInteractions?: Interaction[];
 }
 
 type RecordingState = 'idle' | 'recording' | 'transcribing';
@@ -48,7 +42,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onInteractionUpdate,
   geminiApiKey,
   julesApiKey,
-  defaultRepo
+  defaultRepo,
+  previousInteractions = []
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [error, setError] = useState<string>('');
@@ -218,7 +213,22 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       ]
     }];
 
+    const now = new Date();
+    const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+
+    const history = previousInteractions
+      .filter(interaction => {
+        const time = new Date(interaction.timestamp);
+        return time >= thirtyMinutesAgo && interaction.response; // Only include completed interactions
+      })
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) // Oldest first
+      .flatMap(interaction => [
+        { role: "user", parts: [{ text: `[Past Interaction ${interaction.timestamp.toLocaleTimeString()}] ${interaction.text}` }] },
+        { role: "model", parts: [{ text: interaction.response || "" }] }
+      ]);
+
     let messages = [
+      ...history,
       {
         role: "user",
         parts: [{ text: prompt }]
