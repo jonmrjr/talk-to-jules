@@ -1,15 +1,23 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { JulesClient } from '../lib/jules';
 
 interface AudioRecorderProps {
-  onTranscription: (text: string) => void;
+  onTranscription: (text: string, response?: string) => void;
   geminiApiKey: string;
+  julesApiKey: string;
+  defaultRepo: string;
 }
 
 type RecordingState = 'idle' | 'recording' | 'transcribing';
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({ onTranscription, geminiApiKey }) => {
+const AudioRecorder: React.FC<AudioRecorderProps> = ({
+  onTranscription,
+  geminiApiKey,
+  julesApiKey,
+  defaultRepo
+}) => {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [error, setError] = useState<string>('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -50,7 +58,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onTranscription, geminiAp
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        await transcribeAudio(audioBlob);
+        await processAudio(audioBlob);
       };
 
       mediaRecorder.start(1000); // Collect data every second
@@ -72,7 +80,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onTranscription, geminiAp
     }
   };
 
-  const transcribeAudio = async (audioBlob: Blob) => {
+  const processAudio = async (audioBlob: Blob) => {
     if (!geminiApiKey) {
       setError('Please configure your Gemini API key in settings');
       setRecordingState('idle');
@@ -80,65 +88,176 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onTranscription, geminiAp
     }
 
     try {
-      // Convert blob to base64
+      // 1. Transcribe Audio
+      const transcription = await transcribeAudio(audioBlob);
+      if (!transcription) return;
+
+      // 2. Call Gemini with Jules Tools if configured
+      if (julesApiKey && defaultRepo) {
+        const julesClient = new JulesClient(julesApiKey);
+        const response = await processWithGemini(transcription, julesClient);
+        onTranscription(transcription, response);
+      } else {
+        onTranscription(transcription);
+      }
+
+      setRecordingState('idle');
+    } catch (err) {
+      console.error('Error processing audio:', err);
+      setError(`Processing error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setRecordingState('idle');
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob): Promise<string | null> => {
+    try {
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
       
-      reader.onloadend = async () => {
-        const base64Audio = reader.result as string;
-        const base64Data = base64Audio.split(',')[1];
+      return new Promise((resolve, reject) => {
+        reader.onloadend = async () => {
+          try {
+            const base64Audio = reader.result as string;
+            const base64Data = base64Audio.split(',')[1];
 
-        // Call Gemini API
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  {
-                    text: "Please transcribe this audio accurately. Only return the transcription, nothing else."
-                  },
-                  {
-                    inline_data: {
-                      mime_type: audioBlob.type,
-                      data: base64Data
-                    }
-                  }
-                ]
-              }]
-            })
+            const response = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{
+                    parts: [
+                      { text: "Please transcribe this audio accurately. Only return the transcription, nothing else." },
+                      { inline_data: { mime_type: audioBlob.type, data: base64Data } }
+                    ]
+                  }]
+                })
+              }
+            );
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message || 'Transcription failed');
+
+            if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+              resolve(data.candidates[0].content.parts[0].text);
+            } else {
+              reject(new Error('No transcription received'));
+            }
+          } catch (e) {
+            reject(e);
           }
-        );
-
-        const data = await response.json();
-        
-        if (data.error) {
-          throw new Error(data.error.message || 'Transcription failed');
-        }
-
-        if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-          const transcription = data.candidates[0].content.parts[0].text;
-          onTranscription(transcription);
-        } else {
-          setError('No transcription received');
-        }
-        
-        setRecordingState('idle');
-      };
-
-      reader.onerror = () => {
-        setError('Failed to process audio');
-        setRecordingState('idle');
-      };
+        };
+        reader.onerror = () => reject(new Error('Failed to read audio file'));
+      });
     } catch (err) {
-      console.error('Error transcribing audio:', err);
-      setError(`Transcription error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setRecordingState('idle');
+      throw err;
     }
+  };
+
+  const processWithGemini = async (prompt: string, julesClient: JulesClient): Promise<string> => {
+    const tools = [{
+      function_declarations: [
+        {
+          name: "list_running_tasks",
+          description: "Lists the currently running coding tasks or sessions.",
+        },
+        {
+          name: "create_task",
+          description: "Creates a new coding task or session with the given prompt.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              prompt: {
+                type: "STRING",
+                description: "The description of the coding task to be performed."
+              }
+            },
+            required: ["prompt"]
+          }
+        }
+      ]
+    }];
+
+    let messages = [
+      {
+        role: "user",
+        parts: [{ text: prompt }]
+      }
+    ];
+
+    // Initial call to Gemini
+    const response1 = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: messages,
+          tools: tools
+        })
+      }
+    );
+
+    const data1 = await response1.json();
+
+    if (data1.error) throw new Error(data1.error.message);
+
+    const candidate = data1.candidates?.[0];
+    const content = candidate?.content;
+    const part = content?.parts?.[0];
+
+    if (!part) return "No response from Gemini.";
+
+    // Check for function call
+    if (part.functionCall) {
+      const functionCall = part.functionCall;
+      const functionName = functionCall.name;
+      let functionResponse;
+
+      try {
+        if (functionName === "list_running_tasks") {
+          const sessions = await julesClient.listSessions();
+          functionResponse = { sessions };
+        } else if (functionName === "create_task") {
+          const taskPrompt = functionCall.args.prompt;
+          const session = await julesClient.createSession(taskPrompt, defaultRepo);
+          functionResponse = { session };
+        } else {
+          functionResponse = { error: "Unknown function" };
+        }
+      } catch (e) {
+        functionResponse = { error: e instanceof Error ? e.message : "Unknown error during tool execution" };
+      }
+
+      // Send function response back to Gemini
+      const functionResponsePart = {
+        functionResponse: {
+          name: functionName,
+          response: { result: functionResponse }
+        }
+      };
+
+      messages.push({ role: "model", parts: [part] });
+      messages.push({ role: "function", parts: [functionResponsePart] } as any); // Casting as any because function role structure is specific
+
+      const response2 = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: messages,
+            tools: tools
+          })
+        }
+      );
+
+      const data2 = await response2.json();
+      return data2.candidates?.[0]?.content?.parts?.[0]?.text || "No final response.";
+    }
+
+    return part.text || "No text response.";
   };
 
   const handleButtonClick = () => {
@@ -168,7 +287,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onTranscription, geminiAp
       >
         {recordingState === 'idle' && '🎤 Start Recording'}
         {recordingState === 'recording' && '⏹️ Stop Recording'}
-        {recordingState === 'transcribing' && '⏳ Transcribing...'}
+        {recordingState === 'transcribing' && '⏳ Processing...'}
       </button>
 
       {error && (

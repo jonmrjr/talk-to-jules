@@ -6,6 +6,7 @@ import Settings from '@/components/Settings';
 
 interface Transcription {
   text: string;
+  response?: string;
   timestamp: Date;
 }
 
@@ -13,6 +14,7 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [julesApiKey, setJulesApiKey] = useState('');
+  const [defaultRepo, setDefaultRepo] = useState('');
   const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
 
   useEffect(() => {
@@ -20,8 +22,10 @@ export default function Home() {
     try {
       const savedGeminiKey = localStorage.getItem('geminiApiKey') || '';
       const savedJulesKey = localStorage.getItem('julesApiKey') || '';
+      const savedDefaultRepo = localStorage.getItem('defaultRepo') || '';
       setGeminiApiKey(savedGeminiKey);
       setJulesApiKey(savedJulesKey);
+      setDefaultRepo(savedDefaultRepo);
 
       // Show settings if no API keys are configured
       if (!savedGeminiKey) {
@@ -32,13 +36,14 @@ export default function Home() {
     }
   }, []);
 
-  const handleTranscription = (text: string) => {
-    setTranscriptions(prev => [{ text, timestamp: new Date() }, ...prev]);
+  const handleTranscription = (text: string, response?: string) => {
+    setTranscriptions(prev => [{ text, response, timestamp: new Date() }, ...prev]);
   };
 
-  const handleSaveSettings = (geminiKey: string, julesKey: string) => {
+  const handleSaveSettings = (geminiKey: string, julesKey: string, repo: string) => {
     setGeminiApiKey(geminiKey);
     setJulesApiKey(julesKey);
+    setDefaultRepo(repo);
   };
 
   return (
@@ -94,6 +99,8 @@ export default function Home() {
           <AudioRecorder 
             onTranscription={handleTranscription}
             geminiApiKey={geminiApiKey}
+            julesApiKey={julesApiKey}
+            defaultRepo={defaultRepo}
           />
         </div>
 
@@ -101,7 +108,7 @@ export default function Home() {
         {transcriptions.length > 0 && (
           <div className="max-w-2xl mx-auto">
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Transcriptions
+              Interactions
             </h3>
             <div className="space-y-3">
               {transcriptions.map((item, index) => (
@@ -110,8 +117,19 @@ export default function Home() {
                   className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4
                            border-l-4 border-blue-500"
                 >
-                  <p className="text-gray-800 dark:text-gray-200">{item.text}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">You:</div>
+                  <p className="text-gray-800 dark:text-gray-200 mb-4">{item.text}</p>
+
+                  {item.response && (
+                    <>
+                      <div className="font-medium text-blue-600 dark:text-blue-400 mb-2">Jules:</div>
+                      <div className="text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 p-3 rounded whitespace-pre-wrap">
+                        {item.response}
+                      </div>
+                    </>
+                  )}
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-right">
                     {item.timestamp.toLocaleTimeString()}
                   </p>
                 </div>
@@ -138,6 +156,7 @@ export default function Home() {
           onSave={handleSaveSettings}
           initialGeminiKey={geminiApiKey}
           initialJulesKey={julesApiKey}
+          initialDefaultRepo={defaultRepo}
         />
       )}
     </main>

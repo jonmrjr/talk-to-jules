@@ -4,25 +4,29 @@ import React, { useState, useEffect } from 'react';
 
 interface SettingsProps {
   onClose: () => void;
-  onSave: (geminiKey: string, julesKey: string) => void;
+  onSave: (geminiKey: string, julesKey: string, defaultRepo: string) => void;
   initialGeminiKey?: string;
   initialJulesKey?: string;
+  initialDefaultRepo?: string;
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
   onClose, 
   onSave, 
   initialGeminiKey = '', 
-  initialJulesKey = '' 
+  initialJulesKey = '',
+  initialDefaultRepo = ''
 }) => {
   const [geminiKey, setGeminiKey] = useState(initialGeminiKey);
   const [julesKey, setJulesKey] = useState(initialJulesKey);
+  const [defaultRepo, setDefaultRepo] = useState(initialDefaultRepo);
 
   const handleSave = () => {
     try {
       localStorage.setItem('geminiApiKey', geminiKey);
       localStorage.setItem('julesApiKey', julesKey);
-      onSave(geminiKey, julesKey);
+      localStorage.setItem('defaultRepo', defaultRepo);
+      onSave(geminiKey, julesKey, defaultRepo);
       onClose();
     } catch (error) {
       console.error('Failed to save API keys:', error);
@@ -70,6 +74,25 @@ const Settings: React.FC<SettingsProps> = ({
               value={julesKey}
               onChange={(e) => setJulesKey(e.target.value)}
               placeholder="Enter your Jules API key"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="default-repo"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Default Repo (Source)
+            </label>
+            <input
+              id="default-repo"
+              type="text"
+              value={defaultRepo}
+              onChange={(e) => setDefaultRepo(e.target.value)}
+              placeholder="e.g. sources/github/user/repo"
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                        focus:ring-2 focus:ring-blue-500 focus:border-transparent
                        bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
