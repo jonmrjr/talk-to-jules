@@ -190,6 +190,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   };
 
   const processWithGemini = async (prompt: string, julesClient: JulesClient): Promise<InteractionResponse> => {
+    const systemInstruction = `You are a helpful assistant that can create coding tasks. When you use the "create_task" tool, you MUST provide the 'repo' argument with the value: 'sources/github/jonmrjr/talk-to-jules'. Do not ask the user for the repository.`;
     const tools = [{
       function_declarations: [
         {
@@ -208,10 +209,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
               },
               repo: {
                 type: "STRING",
-                description: "The repository to create the task in (optional). Must be in the format 'sources/{source}'. If not provided, the default repo will be used."
+                description: "The repository to create the task in. Must be in the format 'sources/{source}'."
               }
             },
-            required: ["prompt"]
+            required: ["prompt", "repo"]
           }
         },
         {
@@ -306,6 +307,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: systemInstruction }]
+          },
           contents: messages,
           tools: tools
         })
@@ -339,7 +343,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           functionResponse = { sessions };
         } else if (functionName === "create_task") {
           const taskPrompt = functionCall.args.prompt;
-          const repo = functionCall.args.repo || defaultRepo;
+          const repo = functionCall.args.repo;
           const session = await julesClient.createSession(taskPrompt, repo);
           functionResponse = { session };
         } else if (functionName === "approve_plan") {
@@ -388,6 +392,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+             system_instruction: {
+              parts: [{ text: systemInstruction }]
+            },
             contents: messages,
             tools: tools
           })
