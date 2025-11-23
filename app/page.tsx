@@ -1,12 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import AudioRecorder from '@/components/AudioRecorder';
+import AudioRecorder, { ToolCall } from '@/components/AudioRecorder';
 import Settings from '@/components/Settings';
+import { v4 as uuidv4 } from 'uuid'; // Use uuid to generate unique IDs
 
-interface Transcription {
+interface Interaction {
+  id: string;
   text: string;
   response?: string;
+  toolCalls?: ToolCall[];
+  isLoading?: boolean;
   timestamp: Date;
 }
 
@@ -15,7 +19,7 @@ export default function Home() {
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [julesApiKey, setJulesApiKey] = useState('');
   const [defaultRepo, setDefaultRepo] = useState('');
-  const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
 
   useEffect(() => {
     // Load API keys from localStorage on mount
@@ -36,8 +40,28 @@ export default function Home() {
     }
   }, []);
 
-  const handleTranscription = (text: string, response?: string) => {
-    setTranscriptions(prev => [{ text, response, timestamp: new Date() }, ...prev]);
+  const handleTranscriptionStart = (text: string) => {
+    const id = uuidv4();
+    setInteractions(prev => [{
+      id,
+      text,
+      isLoading: true,
+      timestamp: new Date()
+    }, ...prev]);
+    return id;
+  };
+
+  const handleInteractionUpdate = (id: string, update: Partial<{ response: string, toolCalls: ToolCall[] }>) => {
+    setInteractions(prev => prev.map(item => {
+      if (item.id === id) {
+        return {
+          ...item,
+          ...update,
+          isLoading: false // Stop loading when update is received (or partially updated)
+        };
+      }
+      return item;
+    }));
   };
 
   const handleSaveSettings = (geminiKey: string, julesKey: string, repo: string) => {
@@ -97,36 +121,69 @@ export default function Home() {
         {/* Audio Recorder */}
         <div className="flex justify-center mb-12">
           <AudioRecorder 
-            onTranscription={handleTranscription}
+            onTranscriptionStart={handleTranscriptionStart}
+            onInteractionUpdate={handleInteractionUpdate}
             geminiApiKey={geminiApiKey}
             julesApiKey={julesApiKey}
             defaultRepo={defaultRepo}
           />
         </div>
 
-        {/* Transcriptions List */}
-        {transcriptions.length > 0 && (
+        {/* Interactions List */}
+        {interactions.length > 0 && (
           <div className="max-w-2xl mx-auto">
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
               Interactions
             </h3>
             <div className="space-y-3">
-              {transcriptions.map((item, index) => (
+              {interactions.map((item) => (
                 <div 
-                  key={index}
+                  key={item.id}
                   className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4
                            border-l-4 border-blue-500"
                 >
                   <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">You:</div>
                   <p className="text-gray-800 dark:text-gray-200 mb-4">{item.text}</p>
 
-                  {item.response && (
-                    <>
-                      <div className="font-medium text-blue-600 dark:text-blue-400 mb-2">Jules:</div>
-                      <div className="text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 p-3 rounded whitespace-pre-wrap">
-                        {item.response}
-                      </div>
-                    </>
+                  {/* Tool Calls Visualization */}
+                  {item.toolCalls && item.toolCalls.length > 0 && (
+                    <div className="mb-4 space-y-2">
+                        {item.toolCalls.map((toolCall, idx) => (
+                            <div key={idx} className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-sm font-mono">
+                                <div className="flex items-center text-yellow-600 dark:text-yellow-400 font-semibold">
+                                    <span className="mr-2">🛠️</span>
+                                    {toolCall.name}
+                                </div>
+                                <div className="text-gray-600 dark:text-gray-300 mt-1 text-xs overflow-x-auto">
+                                    <span className="font-semibold">Args:</span> {JSON.stringify(toolCall.args)}
+                                </div>
+                                {toolCall.result && (
+                                    <div className="text-green-600 dark:text-green-400 mt-1 text-xs overflow-x-auto">
+                                        <span className="font-semibold">Result:</span> {JSON.stringify(toolCall.result)}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* Response or Loading */}
+                  {item.isLoading && !item.response ? (
+                    <div className="flex items-center text-gray-500 dark:text-gray-400 animate-pulse">
+                        <span className="mr-2">Thinking...</span>
+                        <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce mr-1"></div>
+                        <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce mr-1 delay-75"></div>
+                        <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+                    </div>
+                  ) : (
+                      item.response && (
+                        <>
+                        <div className="font-medium text-blue-600 dark:text-blue-400 mb-2">Jules:</div>
+                        <div className="text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 p-3 rounded whitespace-pre-wrap">
+                            {item.response}
+                        </div>
+                        </>
+                      )
                   )}
 
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-right">
@@ -139,7 +196,7 @@ export default function Home() {
         )}
 
         {/* Empty State */}
-        {transcriptions.length === 0 && (
+        {interactions.length === 0 && (
           <div className="max-w-2xl mx-auto text-center py-12">
             <div className="text-6xl mb-4">🎙️</div>
             <p className="text-gray-600 dark:text-gray-400">
