@@ -32,8 +32,9 @@ export class JulesClient {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(`Jules API Error: ${error.message || response.statusText}`);
+      const errorBody = await response.json().catch(() => ({}));
+      const errorMessage = errorBody.error?.message || errorBody.message || response.statusText || 'Unknown error';
+      throw new Error(`Jules API Error: ${errorMessage}`);
     }
 
     return response.json();
