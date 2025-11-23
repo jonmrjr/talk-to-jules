@@ -8,18 +8,21 @@ interface SettingsProps {
   initialGeminiKey?: string;
   initialJulesKey?: string;
   initialDefaultRepo?: string;
+  recentSources?: string[];
 }
 
-const Settings: React.FC<SettingsProps> = ({ 
-  onClose, 
-  onSave, 
-  initialGeminiKey = '', 
+const Settings: React.FC<SettingsProps> = ({
+  onClose,
+  onSave,
+  initialGeminiKey = '',
   initialJulesKey = '',
-  initialDefaultRepo = ''
+  initialDefaultRepo = '',
+  recentSources = [],
 }) => {
   const [geminiKey, setGeminiKey] = useState(initialGeminiKey);
   const [julesKey, setJulesKey] = useState(initialJulesKey);
   const [defaultRepo, setDefaultRepo] = useState(initialDefaultRepo);
+  const [showManualRepoInput, setShowManualRepoInput] = useState(false);
 
   const handleSave = () => {
     try {
@@ -87,16 +90,40 @@ const Settings: React.FC<SettingsProps> = ({
             >
               Default Repo (Source)
             </label>
-            <input
-              id="default-repo"
-              type="text"
-              value={defaultRepo}
-              onChange={(e) => setDefaultRepo(e.target.value)}
-              placeholder="e.g. sources/github/user/repo"
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
+            {showManualRepoInput || recentSources.length === 0 ? (
+              <input
+                id="default-repo"
+                type="text"
+                value={defaultRepo}
+                onChange={(e) => setDefaultRepo(e.target.value)}
+                placeholder="e.g. sources/github/user/repo"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                         focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            ) : (
+              <select
+                id="default-repo"
+                value={defaultRepo}
+                onChange={(e) => setDefaultRepo(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                         focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="" disabled>Select a recent repository</option>
+                {recentSources.map(source => (
+                  <option key={source} value={source}>{source}</option>
+                ))}
+              </select>
+            )}
+            {recentSources.length > 0 && (
+              <button
+                onClick={() => setShowManualRepoInput(!showManualRepoInput)}
+                className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {showManualRepoInput ? 'Select from list' : 'Enter manually'}
+              </button>
+            )}
           </div>
         </div>
 

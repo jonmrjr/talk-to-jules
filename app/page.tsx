@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AudioRecorder, { ToolCall, Interaction } from '@/components/AudioRecorder';
 import Settings from '@/components/Settings';
+import { JulesClient } from '@/lib/jules';
 import { v4 as uuidv4 } from 'uuid'; // Use uuid to generate unique IDs
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
   const [julesApiKey, setJulesApiKey] = useState('');
   const [defaultRepo, setDefaultRepo] = useState('');
   const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [recentSources, setRecentSources] = useState<string[]>([]);
 
   useEffect(() => {
     // Load API keys from localStorage on mount
@@ -29,7 +31,26 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to load API keys from localStorage:', error);
     }
-  }, []);
+  }, []); // Runs only once on mount
+
+  useEffect(() => {
+    // Fetch recent sources whenever the Jules API key changes
+    if (julesApiKey) {
+      const julesClient = new JulesClient(julesApiKey);
+      julesClient.listSessions()
+        .then(sessions => {
+          const sources = sessions
+            .map(s => s.sourceContext?.source)
+            .filter((s): s is string => !!s);
+          const uniqueSources = [...new Set(sources)];
+          setRecentSources(uniqueSources);
+        })
+        .catch(err => {
+          console.error("Failed to fetch recent sources:", err);
+          // Handle error, e.g., show a notification
+        });
+    }
+  }, [julesApiKey]); // Runs when julesApiKey changes
 
   const handleTranscriptionStart = (text: string) => {
     const id = uuidv4();
@@ -66,9 +87,16 @@ export default function Home() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Talk to Jules
-          </h1>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Talk to Jules
+            </h1>
+            {defaultRepo && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Repo: {defaultRepo}
+              </p>
+            )}
+          </div>
           <button
             onClick={() => setShowSettings(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 
@@ -206,6 +234,7 @@ export default function Home() {
           initialGeminiKey={geminiApiKey}
           initialJulesKey={julesApiKey}
           initialDefaultRepo={defaultRepo}
+          recentSources={recentSources}
         />
       )}
     </main>

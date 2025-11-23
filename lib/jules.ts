@@ -3,6 +3,9 @@ export interface JulesSession {
   createTime: string;
   title: string;
   state: string;
+  sourceContext?: {
+    source: string;
+  };
 }
 
 export interface JulesSource {
