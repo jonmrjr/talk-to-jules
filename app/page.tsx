@@ -4,27 +4,36 @@ import { useState, useEffect } from 'react';
 import AudioRecorder from '@/components/AudioRecorder';
 import Settings from '@/components/Settings';
 
+interface Transcription {
+  text: string;
+  timestamp: Date;
+}
+
 export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [julesApiKey, setJulesApiKey] = useState('');
-  const [transcriptions, setTranscriptions] = useState<string[]>([]);
+  const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
 
   useEffect(() => {
     // Load API keys from localStorage on mount
-    const savedGeminiKey = localStorage.getItem('geminiApiKey') || '';
-    const savedJulesKey = localStorage.getItem('julesApiKey') || '';
-    setGeminiApiKey(savedGeminiKey);
-    setJulesApiKey(savedJulesKey);
+    try {
+      const savedGeminiKey = localStorage.getItem('geminiApiKey') || '';
+      const savedJulesKey = localStorage.getItem('julesApiKey') || '';
+      setGeminiApiKey(savedGeminiKey);
+      setJulesApiKey(savedJulesKey);
 
-    // Show settings if no API keys are configured
-    if (!savedGeminiKey) {
-      setShowSettings(true);
+      // Show settings if no API keys are configured
+      if (!savedGeminiKey) {
+        setShowSettings(true);
+      }
+    } catch (error) {
+      console.error('Failed to load API keys from localStorage:', error);
     }
   }, []);
 
   const handleTranscription = (text: string) => {
-    setTranscriptions(prev => [text, ...prev]);
+    setTranscriptions(prev => [{ text, timestamp: new Date() }, ...prev]);
   };
 
   const handleSaveSettings = (geminiKey: string, julesKey: string) => {
@@ -95,15 +104,15 @@ export default function Home() {
               Transcriptions
             </h3>
             <div className="space-y-3">
-              {transcriptions.map((text, index) => (
+              {transcriptions.map((item, index) => (
                 <div 
                   key={index}
                   className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4
                            border-l-4 border-blue-500"
                 >
-                  <p className="text-gray-800 dark:text-gray-200">{text}</p>
+                  <p className="text-gray-800 dark:text-gray-200">{item.text}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    {new Date().toLocaleTimeString()}
+                    {item.timestamp.toLocaleTimeString()}
                   </p>
                 </div>
               ))}

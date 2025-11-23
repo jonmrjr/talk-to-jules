@@ -19,10 +19,15 @@ const Settings: React.FC<SettingsProps> = ({
   const [julesKey, setJulesKey] = useState(initialJulesKey);
 
   const handleSave = () => {
-    localStorage.setItem('geminiApiKey', geminiKey);
-    localStorage.setItem('julesApiKey', julesKey);
-    onSave(geminiKey, julesKey);
-    onClose();
+    try {
+      localStorage.setItem('geminiApiKey', geminiKey);
+      localStorage.setItem('julesApiKey', julesKey);
+      onSave(geminiKey, julesKey);
+      onClose();
+    } catch (error) {
+      console.error('Failed to save API keys:', error);
+      alert('Failed to save settings. Please check if local storage is available.');
+    }
   };
 
   return (

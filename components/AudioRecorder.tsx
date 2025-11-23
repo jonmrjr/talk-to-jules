@@ -74,7 +74,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onTranscription, geminiAp
 
   const transcribeAudio = async (audioBlob: Blob) => {
     if (!geminiApiKey) {
-      setError('Please configure your GEMINI API key in settings');
+      setError('Please configure your Gemini API key in settings');
       setRecordingState('idle');
       return;
     }
