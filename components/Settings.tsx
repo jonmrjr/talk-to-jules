@@ -24,6 +24,10 @@ const Settings: React.FC<SettingsProps> = ({
   const [defaultRepo, setDefaultRepo] = useState(initialDefaultRepo);
   const [showManualRepoInput, setShowManualRepoInput] = useState(false);
 
+  useEffect(() => {
+    setShowManualRepoInput(recentSources.length === 0);
+  }, [recentSources]);
+
   const handleSave = () => {
     try {
       localStorage.setItem('geminiApiKey', geminiKey);
@@ -90,7 +94,7 @@ const Settings: React.FC<SettingsProps> = ({
             >
               Default Repo (Source)
             </label>
-            {showManualRepoInput || recentSources.length === 0 ? (
+            {showManualRepoInput ? (
               <input
                 id="default-repo"
                 type="text"

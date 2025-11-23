@@ -1,17 +1,4 @@
-export interface JulesSession {
-  name: string;
-  createTime: string;
-  title: string;
-  state: string;
-  sourceContext?: {
-    source: string;
-  };
-}
-
-export interface JulesSource {
-  name: string;
-  displayName: string;
-}
+import { JulesSession, JulesSource } from '../app/types';
 
 export class JulesClient {
   private apiKey: string;
