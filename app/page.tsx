@@ -37,7 +37,7 @@ export default function Home() {
       julesClient.listSessions()
         .then(sessions => {
           const sources = sessions.map(s => s.sourceContext?.source).filter((s): s is string => !!s);
-          const uniqueSources = [...new Set(sources)];
+          const uniqueSources = Array.from(new Set(sources));
           setRecentSources(uniqueSources);
         })
         .catch(err => console.error("Failed to fetch recent sources:", err));

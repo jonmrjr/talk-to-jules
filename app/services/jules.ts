@@ -1,4 +1,4 @@
-import { JulesSession, JulesSource } from '../app/types';
+import { JulesSession, JulesSource } from '../types';
 
 export class JulesClient {
   private apiKey: string;
