@@ -5,7 +5,7 @@ import { transcribeAudio, processWithGemini } from '../services/gemini';
 import { JulesClient } from '../services/jules';
 import { Interaction } from '../types';
 
-type RecordingState = 'idle' | 'recording' | 'transcribing';
+type RecordingState = 'idle' | 'recording' | 'transcribing' | 'processing';
 
 export const useAudioRecorder = (
   geminiApiKey: string,
@@ -99,6 +99,36 @@ export const useAudioRecorder = (
     }
   };
 
+  const processText = async (inputText: string) => {
+    if (!geminiApiKey) {
+      setError('Please configure your Gemini API key in settings');
+      return;
+    }
+    if (!inputText.trim()) return;
+
+    try {
+      setRecordingState('processing');
+      const interactionId = onTranscriptionStart(inputText);
+
+      if (julesApiKey && defaultRepo) {
+        const julesClient = new JulesClient(julesApiKey);
+        const { text, toolCalls } = await processWithGemini(
+          inputText,
+          julesClient,
+          geminiApiKey,
+          defaultRepo,
+          previousInteractions
+        );
+        onInteractionUpdate(interactionId, { response: text, toolCalls });
+      }
+      setRecordingState('idle');
+    } catch (err) {
+      console.error('Error processing text:', err);
+      setError(`Processing error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setRecordingState('idle');
+    }
+  };
+
   const handleButtonClick = () => {
     if (recordingState === 'idle') {
       startRecording();
@@ -111,5 +141,6 @@ export const useAudioRecorder = (
     recordingState,
     error,
     handleButtonClick,
+    processText,
   };
 };
