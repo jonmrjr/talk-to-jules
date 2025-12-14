@@ -8,6 +8,7 @@
 # logs
 dev_server.log
 npm_output.log
+*.log
 
 # testing
 /coverage
