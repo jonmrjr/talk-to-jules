@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import AudioRecorder from '@/components/AudioRecorder';
 import Settings from '@/components/Settings';
 import { ToolCall, Interaction } from './types';
@@ -160,7 +161,9 @@ export default function Home() {
                   ) : item.response && (
                     <>
                       <div className="font-medium text-blue-600 dark:text-blue-400 mb-2">Jules:</div>
-                      <div className="text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 p-3 rounded whitespace-pre-wrap">{item.response}</div>
+                      <div data-testid="jules-response" className="text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 p-3 rounded">
+                        <ReactMarkdown className="prose dark:prose-invert max-w-none">{item.response}</ReactMarkdown>
+                      </div>
                     </>
                   )}
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-right">{item.timestamp.toLocaleTimeString()}</p>
