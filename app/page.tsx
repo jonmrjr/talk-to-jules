@@ -14,6 +14,7 @@ export default function Home() {
   const [defaultRepo, setDefaultRepo] = useState('');
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [recentSources, setRecentSources] = useState<string[]>([]);
+  const [expandedToolCalls, setExpandedToolCalls] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     try {
@@ -58,6 +59,18 @@ export default function Home() {
     setGeminiApiKey(geminiKey);
     setJulesApiKey(julesKey);
     setDefaultRepo(repo);
+  };
+
+  const toggleToolCall = (id: string) => {
+    setExpandedToolCalls(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -108,21 +121,33 @@ export default function Home() {
                   <p className="text-gray-800 dark:text-gray-200 mb-4">{item.text}</p>
                   {item.toolCalls && item.toolCalls.length > 0 && (
                     <div className="mb-4 space-y-2">
-                      {item.toolCalls.map((toolCall, idx) => (
-                        <div key={idx} className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-sm font-mono">
-                          <div className="flex items-center text-yellow-600 dark:text-yellow-400 font-semibold">
-                            <span className="mr-2">🛠️</span>{toolCall.name}
+                      {item.toolCalls.map((toolCall, idx) => {
+                        const toolCallId = `${item.id}-${idx}`;
+                        const isExpanded = expandedToolCalls.has(toolCallId);
+                        return (
+                          <div key={idx} className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-sm font-mono">
+                            <button onClick={() => toggleToolCall(toolCallId)} className="w-full text-left">
+                              <div className="flex items-center text-yellow-600 dark:text-yellow-400 font-semibold">
+                                <span className="mr-2">🛠️</span>
+                                {toolCall.name}
+                                <span className="ml-auto">{isExpanded ? '[-]' : '[+]'}</span>
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <>
+                                <div className="text-gray-600 dark:text-gray-300 mt-1 text-xs overflow-x-auto">
+                                  <span className="font-semibold">Args:</span> {JSON.stringify(toolCall.args)}
+                                </div>
+                                {toolCall.result && (
+                                  <div className="text-green-600 dark:text-green-400 mt-1 text-xs overflow-x-auto">
+                                    <span className="font-semibold">Result:</span> {JSON.stringify(toolCall.result)}
+                                  </div>
+                                )}
+                              </>
+                            )}
                           </div>
-                          <div className="text-gray-600 dark:text-gray-300 mt-1 text-xs overflow-x-auto">
-                            <span className="font-semibold">Args:</span> {JSON.stringify(toolCall.args)}
-                          </div>
-                          {toolCall.result && (
-                            <div className="text-green-600 dark:text-green-400 mt-1 text-xs overflow-x-auto">
-                              <span className="font-semibold">Result:</span> {JSON.stringify(toolCall.result)}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                   {item.isLoading && !item.response ? (
