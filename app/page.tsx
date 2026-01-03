@@ -162,7 +162,9 @@ export default function Home() {
                     <>
                       <div className="font-medium text-blue-600 dark:text-blue-400 mb-2">Jules:</div>
                       <div data-testid="jules-response" className="text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 p-3 rounded">
-                        <ReactMarkdown className="prose dark:prose-invert max-w-none">{item.response}</ReactMarkdown>
+                        <div className="prose dark:prose-invert max-w-none">
+                          <ReactMarkdown>{item.response}</ReactMarkdown>
+                        </div>
                       </div>
                     </>
                   )}
