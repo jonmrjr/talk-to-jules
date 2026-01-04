@@ -182,6 +182,24 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Built with [Next.js](https://nextjs.org/)
 - Powered by [Google Gemini AI](https://deepmind.google/technologies/gemini/)
 
+## Jules API Integration Plan
+
+This roadmap outlines the steps to fully integrate all available Jules API functionality into the application.
+
+### Phase 1: API Client Completeness
+- [ ] Implement `get` method for Sources (`GET /v1alpha/sources/{name}`)
+- [ ] Implement `get` method for Activities (`GET /v1alpha/{name=sessions/*/activities/*}`)
+- [ ] Update `createSession` to support optional parameters and flexible source context
+
+### Phase 2: UI/UX for Data Visualization
+- [ ] Create `SourceDetails` component to display source metadata
+- [ ] Create `ActivityDetails` component to inspect specific activity progress
+- [ ] Integrate these views into the main dashboard
+
+### Phase 3: Advanced Session Management
+- [ ] Add support for selecting repository branches when creating sessions
+- [ ] Enhance `approvePlan` and `sendMessage` interfaces for better user feedback
+
 ---
 
 **Note**: This is a client-side application. All API keys are stored in your browser's local storage and are never sent to any server except the official Gemini API endpoints.
