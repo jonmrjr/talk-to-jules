@@ -43,12 +43,47 @@ export const transcribeAudio = async (audioBlob: Blob, geminiApiKey: string): Pr
   });
 };
 
+const generateSystemPrompt = (
+  interactionType: 'talk' | 'type',
+  defaultRepo: string,
+  previousInteractions: Interaction[]
+): { parts: [{ text: string }] } => {
+  const historyText = previousInteractions.length > 0
+    ? previousInteractions
+        .map(i => `  - User (${i.timestamp.toLocaleTimeString()}): ${i.text}\n  - Jules: ${i.response || '(No response text)'}`)
+        .join('\n')
+    : '  - No previous interactions in the last 30 minutes.';
+
+  const promptText = `
+# Setup
+You are Jules, an expert software engineer AI.
+- The user ${interactionType === 'talk' ? 'spoke' : 'typed'} the upcoming prompt.
+- The default repository is: ${defaultRepo}
+- The past conversation was:
+${historyText}
+
+# Capabilities
+You can ask Jules to perform coding tasks by interacting with the Jules API. Available actions:
+- **list_running_tasks**: See what tasks are currently in progress.
+- **create_task**: Start a new coding task. You need to provide a clear prompt and optionally a repository.
+- **approve_plan**: Approve a plan that Jules has proposed for a task.
+- **send_message**: Send a follow-up message or instruction for an ongoing task.
+- **get_session**: Get the details of a specific task session.
+- **list_activities**: See the recent activity for a task.
+
+Always use the 'sources/github/jonmrjr/talk-to-jules' repository when creating new tasks unless specified otherwise.
+`.trim();
+
+  return { parts: [{ text: promptText }] };
+};
+
 export const processWithGemini = async (
   prompt: string,
   julesClient: JulesClient,
   geminiApiKey: string,
   defaultRepo: string,
-  previousInteractions: Interaction[]
+  previousInteractions: Interaction[],
+  interactionType: 'talk' | 'type'
 ): Promise<InteractionResponse> => {
   const tools = [{
     function_declarations: [
@@ -140,12 +175,14 @@ export const processWithGemini = async (
   const now = new Date();
   const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
 
-  const history = previousInteractions
+  const recentInteractions = previousInteractions
     .filter(interaction => {
       const time = new Date(interaction.timestamp);
       return time >= thirtyMinutesAgo && interaction.response; // Only include completed interactions
     })
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) // Oldest first
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  const history = recentInteractions
     .flatMap(interaction => [
       { role: "user", parts: [{ text: `[Past Interaction ${interaction.timestamp.toLocaleTimeString()}] ${interaction.text}` }] },
       { role: "model", parts: [{ text: interaction.response || "" }] }
@@ -159,6 +196,8 @@ export const processWithGemini = async (
     }
   ];
 
+  const systemInstruction = generateSystemPrompt(interactionType, defaultRepo, recentInteractions);
+
   // Initial call to Gemini
   const response1 = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
@@ -167,7 +206,8 @@ export const processWithGemini = async (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: messages,
-        tools: tools
+        tools: tools,
+        system_instruction: systemInstruction
       })
     }
   );
@@ -249,7 +289,8 @@ export const processWithGemini = async (
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: messages,
-          tools: tools
+          tools: tools,
+          system_instruction: systemInstruction
         })
       }
     );
