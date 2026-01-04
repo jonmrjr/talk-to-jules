@@ -87,7 +87,8 @@ export const useAudioRecorder = (
           julesClient,
           geminiApiKey,
           defaultRepo,
-          previousInteractions
+          previousInteractions,
+          'talk'
         );
         onInteractionUpdate(interactionId, { response: text, toolCalls });
       }
@@ -117,7 +118,8 @@ export const useAudioRecorder = (
           julesClient,
           geminiApiKey,
           defaultRepo,
-          previousInteractions
+          previousInteractions,
+          'type'
         );
         onInteractionUpdate(interactionId, { response: text, toolCalls });
       }
